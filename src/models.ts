@@ -13,8 +13,8 @@ export type PiModel = {
 	cost: { input: number; output: number; cacheRead: number; cacheWrite: number };
 };
 
-const DEFAULT_CONTEXT = 131_072;
-const DEFAULT_MAX_TOKENS = 8192;
+const DEFAULT_CONTEXT = 262_144;
+const DEFAULT_MAX_TOKENS = 12_288;
 
 function detectThinking(id: string): boolean {
 	return /claude|gemini|gpt-5|hy3|deepseek|glm/i.test(id);
@@ -55,8 +55,25 @@ export const FALLBACK_MODELS: PiModel[] = [
 	{ id: "hy3-preview-agent-ioa", name: "Hunyuan 3 Preview", reasoning: true, input: ["text"], contextWindow: DEFAULT_CONTEXT, maxTokens: DEFAULT_MAX_TOKENS, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } },
 ];
 
-export function buildModels(models: PiModel[]): PiModel[] {
-	return models.map((m) => ({
+export type ModelOverrides = Record<string, { contextWindow?: number; maxTokens?: number }>;
+
+/** Apply per-model contextWindow / maxTokens overrides from config. Key matching is case-insensitive. */
+export function applyOverrides(models: PiModel[], overrides?: ModelOverrides): PiModel[] {
+	if (!overrides || Object.keys(overrides).length === 0) return models;
+	return models.map((m) => {
+		const lower = m.id.toLowerCase();
+		const override = Object.entries(overrides).find(([key]) => key.toLowerCase() === lower)?.[1];
+		if (!override) return m;
+		return {
+			...m,
+			...(override.contextWindow != null ? { contextWindow: override.contextWindow } : {}),
+			...(override.maxTokens != null ? { maxTokens: override.maxTokens } : {}),
+		};
+	});
+}
+
+export function buildModels(models: PiModel[], overrides?: ModelOverrides): PiModel[] {
+	return applyOverrides(models, overrides).map((m) => ({
 		...m,
 		cost: m.cost ?? { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
 	}));

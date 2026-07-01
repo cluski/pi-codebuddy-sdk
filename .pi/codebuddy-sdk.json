@@ -1,0 +1,10 @@
+{
+  "provider": {
+    "models": {
+      "deepseek-v4-pro": {
+        "contextWindow": 1000000,
+        "maxTokens": 100000
+      }
+    }
+  }
+}

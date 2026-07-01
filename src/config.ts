@@ -27,6 +27,8 @@ export interface Config {
 		settingSources?: SettingSource[];
 		strictMcpConfig?: boolean;
 		pathToCodebuddyCode?: string;
+		/** Per-model overrides for contextWindow / maxTokens. Key matches model id (case-insensitive). */
+		models?: Record<string, { contextWindow?: number; maxTokens?: number }>;
 	};
 }
 

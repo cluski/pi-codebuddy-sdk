@@ -3,7 +3,7 @@
  */
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { buildModels, codebuddyModelId, rawModelsFromSdk, resolveModel, FALLBACK_MODELS } from "../src/models.js";
+import { applyOverrides, buildModels, codebuddyModelId, rawModelsFromSdk, resolveModel, FALLBACK_MODELS } from "../src/models.js";
 
 describe("rawModelsFromSdk", () => {
 	it("maps SDK ModelInfo to pi models", () => {
@@ -33,6 +33,49 @@ describe("codebuddyModelId", () => {
 	});
 });
 
+describe("applyOverrides", () => {
+	const models = rawModelsFromSdk([
+		{ value: "model-a", displayName: "A", description: "" },
+		{ value: "model-b", displayName: "B", description: "" },
+	]);
+
+	it("returns unchanged with no overrides", () => {
+		const result = applyOverrides(models, undefined);
+		assert.deepStrictEqual(result.map(m => ({ id: m.id, contextWindow: m.contextWindow })), [
+			{ id: "model-a", contextWindow: 262144 },
+			{ id: "model-b", contextWindow: 262144 },
+		]);
+	});
+
+	it("applies contextWindow override (case-insensitive)", () => {
+		const result = applyOverrides(models, { "MODEL-a": { contextWindow: 256_000 } });
+		assert.equal(result[0].contextWindow, 256_000);
+		assert.equal(result[1].contextWindow, 262144); // unchanged
+	});
+
+	it("applies maxTokens override", () => {
+		const result = applyOverrides(models, { "model-b": { maxTokens: 16_384 } });
+		assert.equal(result[0].maxTokens, 12288); // unchanged
+		assert.equal(result[1].maxTokens, 16_384);
+	});
+
+	it("applies both contextWindow and maxTokens", () => {
+		const result = applyOverrides(models, { "model-a": { contextWindow: 512_000, maxTokens: 32_768 } });
+		assert.equal(result[0].contextWindow, 512_000);
+		assert.equal(result[0].maxTokens, 32_768);
+	});
+
+	it("applies partial override (only contextWindow)", () => {
+		const result = applyOverrides(models, { "model-a": { contextWindow: 128_000 } });
+		assert.equal(result[0].contextWindow, 128_000);
+		assert.equal(result[0].maxTokens, 12288); // unchanged
+	});
+
+	it("empty overrides object returns unchanged", () => {
+		const result = applyOverrides(models, {});
+		assert.deepStrictEqual(result, models);
+	});
+});
 describe("resolveModel", () => {
 	const models = buildModels(FALLBACK_MODELS);
 

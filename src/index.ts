@@ -9,7 +9,7 @@ import { appendFileSync, mkdirSync, realpathSync, statSync } from "fs";
 import { homedir } from "os";
 import { dirname, join } from "path";
 import { PROVIDER_ID, messageContentToText, convertPiMessages } from "./convert.js";
-import { buildModels, codebuddyModelId, FALLBACK_MODELS, rawModelsFromSdk, resolveModel as _resolveModel, type PiModel } from "./models.js";
+import { buildModels, codebuddyModelId, FALLBACK_MODELS, rawModelsFromSdk, resolveModel as _resolveModel, type ModelOverrides, type PiModel } from "./models.js";
 import { MCP_SERVER_NAME, MCP_TOOL_PREFIX, buildCodebuddySystemPrompt } from "./skills.js";
 import { verifyWrittenSession as _verifyWrittenSession } from "./session-verify.js";
 import { extractAllToolResults as _extractAllToolResults, type McpResult } from "./extract-tool-results.js";
@@ -1565,14 +1565,14 @@ let modelsDiscovered = false;
 
 let discoverInFlight: Promise<void> | null = null;
 
-async function discoverModels(pi: ExtensionAPI): Promise<void> {
+async function discoverModels(pi: ExtensionAPI, overrides?: ModelOverrides): Promise<void> {
 	await withSdkGate(async () => {
 		try {
 			const q = query({ prompt: " ", options: { maxTurns: 0, permissionMode: "bypassPermissions", tools: [] } });
 			const supported = await q.supportedModels();
 			await q.return().catch(() => {});
 			if (!supported.length) return;
-			MODELS = buildModels(rawModelsFromSdk(supported as any));
+			MODELS = buildModels(rawModelsFromSdk(supported as any), overrides);
 			const g = globalThis as Record<symbol, any>;
 			const streamFn = g[ACTIVE_STREAM_SIMPLE_KEY] ?? streamCodebuddySdk;
 			pi.registerProvider(PROVIDER_ID, {
@@ -1602,9 +1602,10 @@ export default function (pi: ExtensionAPI) {
 	const config = loadConfig(process.cwd());
 	debug("loadConfig:", JSON.stringify(config));
 	providerSettings = config.provider ?? {};
-	const registeredModels = MODELS;
+	const modelOverrides = config.provider?.models;
+	const registeredModels = buildModels(MODELS, modelOverrides);
 
-	discoverInFlight = discoverModels(pi);
+	discoverInFlight = discoverModels(pi, modelOverrides);
 
 	const clearSession = (event: string) => {
 		debug(`${event}: clearing session ${sharedSession?.sessionId?.slice(0, 8) ?? "none"}`);
